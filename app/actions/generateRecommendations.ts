@@ -30,7 +30,7 @@ export async function getRecommendations({
   const { object: recommendations } = await generateObject({
     model: openai("gpt-4-turbo"),
     system:
-      "You are an expert agricultural assistant who provides detailed recommendations for irrigation and crop care based on provided data. Provide it in russian language",
+      "You are an expert agricultural assistant who provides detailed recommendations for irrigation and crop care based on provided water-resources. Provide it in russian language",
     prompt: `
 Provide detailed recommendations based on the following data:
 
