@@ -1,6 +1,8 @@
+// File: components/PlannerPage.tsx
+
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,9 +26,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import AIChat from "@/components/shared/ai-chat"; // Предполагается, что у вас уже есть компонент AIChat
+import AIChat from "@/components/shared/ai-chat";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { getRecommendations } from "@/app/actions/generateRecommendations";
 
 const PlannerPage = () => {
   const [soilType, setSoilType] = useState("");
@@ -34,43 +37,97 @@ const PlannerPage = () => {
   const [fieldArea, setFieldArea] = useState("");
   const [rootDepth, setRootDepth] = useState("");
   const [useWeatherData, setUseWeatherData] = useState(false);
+  const [useAutomaticWeatherData, setUseAutomaticWeatherData] = useState(true);
   const [manualWeatherData, setManualWeatherData] = useState({
     temperature: "",
     humidity: "",
     precipitation: "",
   });
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [results, setResults] = useState<any>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [subscribeAlerts, setSubscribeAlerts] = useState(false);
   const [saveData, setSaveData] = useState(false);
 
-  const handleCalculate = () => {
-    // Здесь вы можете добавить логику для расчета на основе введенных данных
-    // Например, сделать запрос к серверу или использовать ИИ для генерации рекомендаций
-    const calculatedResults = {
-      waterVolume: "96,000 литров в день",
-      irrigationSchedule: "2 раза в неделю по 48,000 литров",
-      weatherNote: "В ближайшие дни ожидается дождь. Скорректируйте полив.",
-      tips: [
-        "Поливайте рано утром или поздно вечером, чтобы минимизировать испарение.",
-        "Проверьте почву на наличие вредителей во влажные периоды.",
-      ],
+  useEffect(() => {
+    if (useWeatherData && useAutomaticWeatherData) {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setLatitude(position.coords.latitude);
+            setLongitude(position.coords.longitude);
+          },
+          (error) => {
+            console.error("Error getting geolocation: ", error);
+          }
+        );
+      } else {
+        console.error("Geolocation not available");
+      }
+    }
+  }, [useWeatherData, useAutomaticWeatherData]);
+
+  useEffect(() => {
+    if (latitude && longitude && useAutomaticWeatherData) {
+      const fetchWeatherData = async () => {
+        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${process.env.NEXT_PUBLIC_WEATHER}`;
+
+        try {
+          const response = await fetch(url);
+          const data = await response.json();
+
+          const temperature = data.main.temp.toString();
+          const humidity = data.main.humidity.toString();
+          const precipitation = data.rain ? data.rain["1h"].toString() : "0";
+
+          setManualWeatherData({
+            temperature,
+            humidity,
+            precipitation,
+          });
+        } catch (error) {
+          console.error("Error fetching weather data: ", error);
+        }
+      };
+
+      fetchWeatherData();
+    }
+  }, [latitude, longitude, useAutomaticWeatherData]);
+
+  // Function to handle calculation and get recommendations
+  const handleCalculate = async () => {
+    const data = {
+      soilType,
+      cropType,
+      fieldArea,
+      rootDepth: rootDepth || null,
+      weatherData: useWeatherData
+        ? {
+            temperature: manualWeatherData.temperature || null,
+            humidity: manualWeatherData.humidity || null,
+            precipitation: manualWeatherData.precipitation || null,
+          }
+        : null,
     };
-    setResults(calculatedResults);
-    setShowResults(true);
+
+    try {
+      const calculatedResults = await getRecommendations(data); // Call the server action
+      setResults(calculatedResults.recommendations);
+      setShowResults(true);
+    } catch (error) {
+      console.error("Error getting recommendations: ", error);
+    }
   };
 
   const handleSaveData = () => {
-    // Логика сохранения данных пользователя
     setSaveData(true);
   };
 
   const handleSubscribeAlerts = () => {
-    // Логика подписки на оповещения
     setSubscribeAlerts(true);
   };
-
   return (
     <div className="container mx-auto p-4">
       <Card>
@@ -87,9 +144,9 @@ const PlannerPage = () => {
             оптимальный график полива и предложит советы по уходу, учитывая
             климатические условия и специфические характеристики вашего участка.
           </p>
-          {/* Форма для ввода данных */}
+          {/* Input Form */}
           <div className="space-y-4">
-            {/* Тип почвы */}
+            {/* Soil Type */}
             <div>
               <Label htmlFor="soilType">Тип почвы</Label>
               <Select onValueChange={setSoilType}>
@@ -111,7 +168,7 @@ const PlannerPage = () => {
                 разные почвы имеют разные способности удерживать влагу.
               </p>
             </div>
-            {/* Тип культуры */}
+            {/* Crop Type */}
             <div>
               <Label htmlFor="cropType">Тип культуры</Label>
               <Select onValueChange={setCropType}>
@@ -134,7 +191,7 @@ const PlannerPage = () => {
                 требуют разного объема воды и ухода.
               </p>
             </div>
-            {/* Площадь поля */}
+            {/* Field Area */}
             <div>
               <Label htmlFor="fieldArea">Площадь поля (га)</Label>
               <Input
@@ -148,12 +205,12 @@ const PlannerPage = () => {
                 Введите площадь в гектарах (1 га = 10,000 м²)
               </p>
             </div>
-            {/* Дополнительные параметры */}
+            {/* Additional Parameters */}
             <div className="space-y-2">
               <h3 className="text-lg font-semibold">
                 Дополнительные параметры (опционально)
               </h3>
-              {/* Глубина корней */}
+              {/* Root Depth */}
               <div>
                 <Label htmlFor="rootDepth">Глубина корней (см)</Label>
                 <Input
@@ -168,7 +225,7 @@ const PlannerPage = () => {
                   может влиять на график полива.
                 </p>
               </div>
-              {/* Климатические условия */}
+              {/* Weather Conditions */}
               <div className="flex items-center space-x-2">
                 <Switch
                   id="useWeatherData"
@@ -184,20 +241,16 @@ const PlannerPage = () => {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="autoWeather"
-                      checked={!manualWeatherData.temperature}
+                      checked={useAutomaticWeatherData}
                       onCheckedChange={(checked) =>
-                        setManualWeatherData((prev) => ({
-                          temperature: checked ? "" : prev.temperature,
-                          humidity: checked ? "" : prev.humidity,
-                          precipitation: checked ? "" : prev.precipitation,
-                        }))
+                        setUseAutomaticWeatherData(checked)
                       }
                     />
                     <Label htmlFor="autoWeather">
                       Учитывать погодные данные автоматически
                     </Label>
                   </div>
-                  {!manualWeatherData.temperature && (
+                  {!useAutomaticWeatherData && (
                     <div>
                       <Label>Введите погодные данные вручную</Label>
                       <div className="grid grid-cols-3 gap-2">
@@ -240,13 +293,13 @@ const PlannerPage = () => {
                 </div>
               )}
             </div>
-            {/* Кнопка расчета */}
+            {/* Calculate Button */}
             <Button onClick={handleCalculate}>Получить рекомендации</Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Результаты и рекомендации */}
+      {/* Results and Recommendations */}
       {showResults && results && (
         <Card className="mt-6">
           <CardHeader>
@@ -411,7 +464,7 @@ const PlannerPage = () => {
         </Card>
       )}
 
-      {/* Модальное окно с чатом ИИ */}
+      {/* AI Chat Modal */}
       {isChatOpen && (
         <Dialog open={isChatOpen} onOpenChange={setIsChatOpen}>
           <DialogContent className="max-w-3xl">
