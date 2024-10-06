@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { StepBack } from "lucide-react";
+import { login } from "@/app/auth/login/actions";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -50,10 +51,14 @@ const LoginPage = () => {
         {/* Form */}
         <form>
           <div className="mb-5">
-            <label className="block text-gray-700 font-medium mb-2">
+            <label
+              htmlFor="email"
+              className="block text-gray-700 font-medium mb-2"
+            >
               Почта *
             </label>
             <input
+              name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -64,10 +69,14 @@ const LoginPage = () => {
           </div>
 
           <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">
+            <label
+              htmlFor="password"
+              className="block text-gray-700 font-medium mb-2"
+            >
               Пароль *
             </label>
             <input
+              name="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -81,7 +90,7 @@ const LoginPage = () => {
             <div className="flex items-center">
               <span className="text-sm text-gray-600">Нет аккаунта?</span>
               <Link
-                href="/auth/signup"
+                href="/auth/register"
                 className="ml-1 text-green-600 hover:underline"
               >
                 Создайте его!
@@ -92,6 +101,7 @@ const LoginPage = () => {
           <button
             type="submit"
             className="w-full py-2 px-4 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50"
+            formAction={login}
           >
             Войти
           </button>

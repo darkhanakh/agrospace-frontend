@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { StepBack } from "lucide-react";
+import { signup } from "@/app/auth/login/actions";
 
 const RegisterPage = () => {
   const [name, setName] = useState("");
@@ -56,10 +57,14 @@ const RegisterPage = () => {
         {/* Form */}
         <form>
           <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-2">
+            <label
+              htmlFor="name"
+              className="block text-gray-700 font-medium mb-2"
+            >
               Имя *
             </label>
             <input
+              name="name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -70,10 +75,14 @@ const RegisterPage = () => {
           </div>
 
           <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-2">
+            <label
+              htmlFor="email"
+              className="block text-gray-700 font-medium mb-2"
+            >
               Почта *
             </label>
             <input
+              name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -84,10 +93,14 @@ const RegisterPage = () => {
           </div>
 
           <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-2">
+            <label
+              htmlFor="password"
+              className="block text-gray-700 font-medium mb-2"
+            >
               Придумайте пароль *
             </label>
             <input
+              name="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -98,10 +111,14 @@ const RegisterPage = () => {
           </div>
 
           <div className="mb-4">
-            <label className="block text-gray-700 font-medium mb-2">
+            <label
+              htmlFor="password_confirm"
+              className="block text-gray-700 font-medium mb-2"
+            >
               Повторите пароль *
             </label>
             <input
+              name="password_confirm"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -112,10 +129,14 @@ const RegisterPage = () => {
           </div>
 
           <div className="mb-6">
-            <label className="block text-gray-700 font-medium mb-2">
+            <label
+              htmlFor="region"
+              className="block text-gray-700 font-medium mb-2"
+            >
               Регион *
             </label>
             <input
+              name="region"
               type="text"
               value={region}
               onChange={(e) => setRegion(e.target.value)}
@@ -127,10 +148,7 @@ const RegisterPage = () => {
 
           <div className="flex items-center justify-between mb-6">
             <div className="text-sm text-gray-600">Уже есть аккаунт?</div>
-            <Link
-              href="/auth/signin"
-              className="text-green-600 hover:underline"
-            >
+            <Link href="/auth/login" className="text-green-600 hover:underline">
               Войдите!
             </Link>
           </div>
@@ -138,6 +156,7 @@ const RegisterPage = () => {
           <button
             type="submit"
             className="w-full py-2 px-4 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50"
+            formAction={signup}
           >
             Создать
           </button>

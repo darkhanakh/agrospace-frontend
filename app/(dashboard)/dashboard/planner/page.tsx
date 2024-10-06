@@ -30,6 +30,20 @@ import AIChat from "@/components/shared/ai-chat";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { getRecommendations } from "@/app/actions/generateRecommendations";
+import { useToast } from "@/hooks/use-toast";
+
+// Импорты для карты
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+
+// Исправление для иконок Leaflet
+import L from "leaflet";
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: require("leaflet/dist/images/marker-icon-2x.png").default,
+  iconUrl: require("leaflet/dist/images/marker-icon.png").default,
+  shadowUrl: require("leaflet/dist/images/marker-shadow.png").default,
+});
 
 const PlannerPage = () => {
   const [soilType, setSoilType] = useState("");
@@ -41,7 +55,6 @@ const PlannerPage = () => {
   const [manualWeatherData, setManualWeatherData] = useState({
     temperature: "",
     humidity: "",
-    precipitation: "",
   });
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
@@ -50,6 +63,13 @@ const PlannerPage = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [subscribeAlerts, setSubscribeAlerts] = useState(false);
   const [saveData, setSaveData] = useState(false);
+  const [alertHighTemp, setAlertHighTemp] = useState(true);
+  const [alertFrost, setAlertFrost] = useState(true);
+  const { toast } = useToast();
+
+  // Новые состояния
+  const [risksData, setRisksData] = useState<any>([]);
+  const [loading, setLoading] = useState(false); // Для индикатора загрузки
 
   useEffect(() => {
     if (useWeatherData && useAutomaticWeatherData) {
@@ -61,43 +81,90 @@ const PlannerPage = () => {
           },
           (error) => {
             console.error("Error getting geolocation: ", error);
+            toast({
+              title: "Ошибка",
+              description: "Не удалось получить геолокацию.",
+              status: "error",
+            });
           }
         );
       } else {
         console.error("Geolocation not available");
+        toast({
+          title: "Ошибка",
+          description: "Геолокация недоступна в вашем браузере.",
+          status: "error",
+        });
       }
     }
   }, [useWeatherData, useAutomaticWeatherData]);
 
+  const fetchDetailedWeatherData = async () => {
+    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&lang=ru&appid=${process.env.NEXT_PUBLIC_WEATHER}`;
+
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      return data; // Возвращаем погодные данные
+    } catch (error) {
+      console.error("Error fetching detailed weather data: ", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось получить погодные данные.",
+        status: "error",
+      });
+      return null;
+    }
+  };
+
   useEffect(() => {
-    if (latitude && longitude && useAutomaticWeatherData) {
+    if (latitude && longitude && useAutomaticWeatherData && useWeatherData) {
       const fetchWeatherData = async () => {
-        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${process.env.NEXT_PUBLIC_WEATHER}`;
+        const data = await fetchDetailedWeatherData();
 
-        try {
-          const response = await fetch(url);
-          const data = await response.json();
-
+        if (data) {
           const temperature = data.main.temp.toString();
           const humidity = data.main.humidity.toString();
-          const precipitation = data.rain ? data.rain["1h"].toString() : "0";
 
           setManualWeatherData({
             temperature,
             humidity,
-            precipitation,
           });
-        } catch (error) {
-          console.error("Error fetching weather water-resources: ", error);
         }
       };
 
       fetchWeatherData();
     }
-  }, [latitude, longitude, useAutomaticWeatherData]);
+  }, [latitude, longitude, useAutomaticWeatherData, useWeatherData]);
 
-  // Function to handle calculation and get recommendations
+  const assessWeatherRisks = (weatherData: any) => {
+    const risks = [];
+
+    // Оценка риска высокой температуры
+    if (alertHighTemp && weatherData.main.temp > 35) {
+      risks.push({
+        type: "Высокая температура",
+        message:
+          "Высокая температура сегодня может привести к стрессу у растений.",
+      });
+    }
+
+    // Оценка риска заморозков
+    if (alertFrost && weatherData.main.temp < 0) {
+      risks.push({
+        type: "Заморозки",
+        message: "Заморозки ночью могут повредить растения.",
+      });
+    }
+
+    // Добавьте дополнительные оценки по необходимости
+
+    return risks;
+  };
+
+  // Функция для получения рекомендаций и оценки погодных рисков
   const handleCalculate = async () => {
+    setLoading(true);
     const data = {
       soilType,
       cropType,
@@ -107,37 +174,75 @@ const PlannerPage = () => {
         ? {
             temperature: manualWeatherData.temperature || null,
             humidity: manualWeatherData.humidity || null,
-            precipitation: manualWeatherData.precipitation || null,
           }
         : null,
     };
 
     try {
-      const calculatedResults = await getRecommendations(data); // Call the server action
-      setResults(calculatedResults.recommendations);
+      let weatherRisks = [];
+
+      if (useWeatherData) {
+        // Получаем подробные погодные данные
+        const weatherData = await fetchDetailedWeatherData();
+        if (weatherData) {
+          // Оцениваем погодные риски
+          weatherRisks = assessWeatherRisks(weatherData);
+          setRisksData(weatherRisks);
+        }
+      }
+
+      // Включаем риски в данные для получения рекомендаций
+      const calculatedResults = await getRecommendations({
+        ...data,
+        weatherRisks,
+      }); // Вызываем серверное действие
+
+      setResults({
+        ...calculatedResults.recommendations,
+        weatherRisks,
+      });
       setShowResults(true);
     } catch (error) {
-      console.error("Error getting recommendations: ", error);
+      console.error("Error getting recommendations or weather risks: ", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось получить рекомендации.",
+        action: "error",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSaveData = () => {
     setSaveData(true);
+    toast({
+      title: "Успех",
+      description: "Рекомендации сохранены.",
+      action: "success",
+    });
   };
 
-  const handleSubscribeAlerts = () => {
+  const handleSubscribeToWeatherAlerts = () => {
     setSubscribeAlerts(true);
+    toast({
+      title: "Подписка оформлена",
+      description: "Вы подписаны на оповещения о погодных рисках.",
+      action: "success",
+    });
   };
+
   return (
     <div className="container mx-auto p-4">
-      <Card>
+      {/* Форма ввода */}
+      <Card className="bg-white shadow-lg rounded-lg p-6">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">
+          <CardTitle className="text-2xl font-bold text-gray-800">
             Калькулятор Полива и Рекомендации ИИ
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="mb-4">
+          <p className="mb-6 text-gray-600">
             Используйте наш калькулятор, чтобы получить персонализированные
             рекомендации по поливу и уходу за полем. Просто введите данные о
             типе почвы, культуре и размере вашего поля, и наш ИИ рассчитает
@@ -145,12 +250,14 @@ const PlannerPage = () => {
             климатические условия и специфические характеристики вашего участка.
           </p>
           {/* Input Form */}
-          <div className="space-y-4">
-            {/* Soil Type */}
+          <div className="space-y-6">
+            {/* Тип почвы */}
             <div>
-              <Label htmlFor="soilType">Тип почвы</Label>
+              <Label htmlFor="soilType" className="text-gray-700 font-medium">
+                Тип почвы
+              </Label>
               <Select onValueChange={setSoilType}>
-                <SelectTrigger id="soilType">
+                <SelectTrigger id="soilType" className="mt-2">
                   <SelectValue placeholder="Выберите тип почвы" />
                 </SelectTrigger>
                 <SelectContent>
@@ -163,16 +270,18 @@ const PlannerPage = () => {
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-gray-500 mt-2">
                 Укажите тип почвы на вашем поле. Это важно для расчета, так как
                 разные почвы имеют разные способности удерживать влагу.
               </p>
             </div>
-            {/* Crop Type */}
+            {/* Тип культуры */}
             <div>
-              <Label htmlFor="cropType">Тип культуры</Label>
+              <Label htmlFor="cropType" className="text-gray-700 font-medium">
+                Тип культуры
+              </Label>
               <Select onValueChange={setCropType}>
-                <SelectTrigger id="cropType">
+                <SelectTrigger id="cropType" className="mt-2">
                   <SelectValue placeholder="Выберите тип культуры" />
                 </SelectTrigger>
                 <SelectContent>
@@ -186,58 +295,70 @@ const PlannerPage = () => {
                   <SelectItem value="Другие">Другие</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-gray-500 mt-2">
                 Выберите культуру, которую вы выращиваете. Разные растения
                 требуют разного объема воды и ухода.
               </p>
             </div>
-            {/* Field Area */}
+            {/* Площадь поля */}
             <div>
-              <Label htmlFor="fieldArea">Площадь поля (га)</Label>
+              <Label htmlFor="fieldArea" className="text-gray-700 font-medium">
+                Площадь поля (га)
+              </Label>
               <Input
                 id="fieldArea"
                 type="number"
                 placeholder="Введите площадь в гектарах"
                 value={fieldArea}
                 onChange={(e) => setFieldArea(e.target.value)}
+                className="mt-2"
               />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-gray-500 mt-2">
                 Введите площадь в гектарах (1 га = 10,000 м²)
               </p>
             </div>
-            {/* Additional Parameters */}
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold">
+            {/* Дополнительные параметры */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-800">
                 Дополнительные параметры (опционально)
               </h3>
-              {/* Root Depth */}
+              {/* Глубина корней */}
               <div>
-                <Label htmlFor="rootDepth">Глубина корней (см)</Label>
+                <Label
+                  htmlFor="rootDepth"
+                  className="text-gray-700 font-medium"
+                >
+                  Глубина корней (см)
+                </Label>
                 <Input
                   id="rootDepth"
                   type="number"
                   placeholder="Введите глубину корней"
                   value={rootDepth}
                   onChange={(e) => setRootDepth(e.target.value)}
+                  className="mt-2"
                 />
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-gray-500 mt-2">
                   Для некоторых культур важно учитывать глубину корней, что
                   может влиять на график полива.
                 </p>
               </div>
-              {/* Weather Conditions */}
-              <div className="flex items-center space-x-2">
+              {/* Погодные данные */}
+              <div className="flex items-center space-x-2 mt-4">
                 <Switch
                   id="useWeatherData"
                   checked={useWeatherData}
                   onCheckedChange={setUseWeatherData}
                 />
-                <Label htmlFor="useWeatherData">
+                <Label
+                  htmlFor="useWeatherData"
+                  className="text-gray-700 font-medium"
+                >
                   Учитывать погодные данные
                 </Label>
               </div>
               {useWeatherData && (
-                <div className="space-y-2">
+                <div className="space-y-4 mt-4">
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="autoWeather"
@@ -246,14 +367,16 @@ const PlannerPage = () => {
                         setUseAutomaticWeatherData(checked)
                       }
                     />
-                    <Label htmlFor="autoWeather">
-                      Учитывать погодные данные автоматически
+                    <Label htmlFor="autoWeather" className="text-gray-700">
+                      Получать погодные данные автоматически
                     </Label>
                   </div>
                   {!useAutomaticWeatherData && (
                     <div>
-                      <Label>Введите погодные данные вручную</Label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <Label className="text-gray-700 font-medium">
+                        Введите погодные данные вручную
+                      </Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                         <Input
                           type="number"
                           placeholder="Температура (°C)"
@@ -276,70 +399,59 @@ const PlannerPage = () => {
                             }))
                           }
                         />
-                        <Input
-                          type="number"
-                          placeholder="Осадки (мм)"
-                          value={manualWeatherData.precipitation}
-                          onChange={(e) =>
-                            setManualWeatherData((prev) => ({
-                              ...prev,
-                              precipitation: e.target.value,
-                            }))
-                          }
-                        />
                       </div>
                     </div>
                   )}
                 </div>
               )}
             </div>
-            {/* Calculate Button */}
-            <Button onClick={handleCalculate}>Получить рекомендации</Button>
+            {/* Кнопка расчета */}
+            <Button
+              onClick={handleCalculate}
+              className="w-full md:w-auto mt-6"
+              disabled={loading}
+            >
+              {loading ? "Загрузка..." : "Получить рекомендации"}
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Results and Recommendations */}
+      {/* Результаты и рекомендации */}
       {showResults && results && (
-        <Card className="mt-6">
+        <Card className="mt-10 bg-white shadow-lg rounded-lg p-6">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold flex items-center space-x-2">
+            <CardTitle className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
               <svg
-                className="w-6 h-6 text-primary"
+                className="w-6 h-6 text-green-600"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                {/* Example icon */}
+                {/* Иконка */}
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth="2"
-                  d="M12 8c1.657 0 3-1.567 3-3.5S13.657 1 12 1 9 2.567 9 4.5s1.343 3.5 3 3.5z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M5 21h14M5 10h14M5 6h14M5 14h14"
+                  d="M3 7h18M3 12h18M3 17h18"
                 />
               </svg>
               <span>Ваш график полива и рекомендации</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Summary Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Water Volume */}
-              <div className="flex items-center space-x-3">
+          <CardContent className="space-y-8">
+            {/* Краткая информация */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Объем воды */}
+              <div className="flex items-center space-x-4">
                 <div className="flex-shrink-0">
                   <svg
-                    className="w-10 h-10 text-blue-500"
+                    className="w-12 h-12 text-blue-500"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    {/* Water drop icon */}
+                    {/* Иконка капли воды */}
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -349,22 +461,24 @@ const PlannerPage = () => {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-lg font-semibold">Объем воды для полива</p>
-                  <p className="text-xl font-bold text-blue-600">
+                  <p className="text-lg font-semibold text-gray-700">
+                    Объем воды для полива
+                  </p>
+                  <p className="text-2xl font-bold text-blue-600">
                     {results.waterVolume}
                   </p>
                 </div>
               </div>
-              {/* Irrigation Schedule */}
-              <div className="flex items-center space-x-3">
+              {/* График полива */}
+              <div className="flex items-center space-x-4">
                 <div className="flex-shrink-0">
                   <svg
-                    className="w-10 h-10 text-green-500"
+                    className="w-12 h-12 text-green-500"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    {/* Calendar icon */}
+                    {/* Иконка календаря */}
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -374,97 +488,109 @@ const PlannerPage = () => {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-lg font-semibold">График полива</p>
-                  <p className="text-xl font-bold text-green-600">
+                  <p className="text-lg font-semibold text-gray-700">
+                    График полива
+                  </p>
+                  <p className="text-2xl font-bold text-green-600">
                     {results.irrigationSchedule}
                   </p>
                 </div>
               </div>
             </div>
-            {/* Weather Note */}
-            {results.weatherNote && (
-              <div className="p-4 bg-yellow-100 rounded-lg flex items-center space-x-3">
-                <svg
-                  className="w-8 h-8 text-yellow-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  {/* Weather icon */}
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M3 15a4 4 0 010-8 4.001 4.001 0 017.9-1.4A5.5 5.5 0 1121 11h-1"
-                  />
-                </svg>
-                <p className="text-yellow-800 font-medium">
-                  {results.weatherNote}
-                </p>
+            {/* Раздел рисков */}
+            {risksData && risksData.length > 0 && (
+              <div className="p-6 bg-red-100 rounded-lg">
+                <h3 className="text-xl font-semibold text-red-700 mb-4">
+                  Предупреждения о погодных рисках
+                </h3>
+                <ul className="list-disc list-inside text-red-700 space-y-2">
+                  {risksData.map((risk: any, index: number) => (
+                    <li key={index}>
+                      <strong>{risk.type}:</strong> {risk.message}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
-            {/* Additional Tips */}
+            {/* Карта */}
+            {latitude && longitude && (
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">
+                  Ваше поле на карте
+                </h3>
+                <div className="h-64 w-full rounded-lg overflow-hidden">
+                  <MapContainer
+                    center={[latitude, longitude]}
+                    zoom={13}
+                    scrollWheelZoom={false}
+                    style={{ height: "100%", width: "100%" }}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <Marker position={[latitude, longitude]}>
+                      <Popup>Ваше поле находится здесь.</Popup>
+                    </Marker>
+                  </MapContainer>
+                </div>
+              </div>
+            )}
+            {/* Дополнительные советы */}
             <div>
-              <h3 className="text-lg font-semibold mb-2">
+              <h3 className="text-xl font-semibold text-gray-800 mb-4">
                 Дополнительные советы
               </h3>
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {results.tips.map((tip: string, index: number) => (
-                  <li key={index} className="flex items-start space-x-2">
+                  <li key={index} className="flex items-start space-x-3">
                     <svg
-                      className="w-6 h-6 text-primary mt-1"
+                      className="w-6 h-6 text-green-600 mt-1"
                       fill="currentColor"
                       viewBox="0 0 20 20"
                     >
-                      {/* Checkmark icon */}
+                      {/* Иконка галочки */}
                       <path
                         fillRule="evenodd"
                         d="M16.707 5.293a1 1 0 00-1.414 0L9 11.586 6.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l7-7a1 1 0 000-1.414z"
                         clipRule="evenodd"
                       />
                     </svg>
-                    <p>{tip}</p>
+                    <p className="text-gray-700">{tip}</p>
                   </li>
                 ))}
               </ul>
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-            {/* Chat with AI Bot */}
-            <div className="flex items-center space-x-2">
-              <p className="font-medium">
+          <CardFooter className="flex flex-col md:flex-row md:items-center md:justify-between space-y-6 md:space-y-0">
+            {/* Чат с ИИ */}
+            <div className="flex items-center space-x-4">
+              <p className="font-medium text-gray-700">
                 Хотите узнать больше? Задайте вопросы нашему ИИ-боту!
               </p>
               <Button onClick={() => setIsChatOpen(true)} variant="outline">
                 Спросить ИИ
               </Button>
             </div>
-            {/* Actions */}
+            {/* Действия */}
             <div className="flex space-x-4">
-              {/* Save Recommendations */}
+              {/* Сохранить рекомендации */}
               <Button onClick={handleSaveData} variant="secondary">
                 Сохранить рекомендации
               </Button>
-              {saveData && (
-                <span className="text-green-600 font-medium">
-                  Рекомендации сохранены
-                </span>
-              )}
-              {/* Subscribe to Alerts */}
-              <Button onClick={handleSubscribeAlerts} variant="secondary">
+              {/* Подписаться на оповещения */}
+              <Button
+                onClick={handleSubscribeToWeatherAlerts}
+                variant="secondary"
+              >
                 Подписаться на оповещения
               </Button>
-              {subscribeAlerts && (
-                <span className="text-green-600 font-medium">
-                  Вы подписаны на оповещения
-                </span>
-              )}
             </div>
           </CardFooter>
         </Card>
       )}
 
-      {/* AI Chat Modal */}
+      {/* Модальное окно чата с ИИ */}
       {isChatOpen && (
         <Dialog open={isChatOpen} onOpenChange={setIsChatOpen}>
           <DialogContent className="max-w-3xl">

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { memo } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   LineChart,
@@ -10,10 +10,12 @@ import {
   MessageSquare,
   Calendar,
   Menu,
+  LogOut, // Importing the logout icon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SidebarButton } from "@/components/shared/sidebar-button";
 import Link from "next/link";
+import { createClient } from "@/lib/utils/supabase/client";
 
 interface Props {
   className?: string;
@@ -35,6 +37,14 @@ const routeMapping = [
 
 const Sidebar: React.FC<Props> = memo(({ isSidebarOpen, setIsSidebarOpen }) => {
   const pathname = usePathname();
+  const supabase = createClient();
+  const router = useRouter();
+
+  const signOut = () => {
+    supabase.auth.signOut().then(() => {
+      router.replace("/");
+    });
+  };
 
   return (
     <aside
@@ -66,6 +76,15 @@ const Sidebar: React.FC<Props> = memo(({ isSidebarOpen, setIsSidebarOpen }) => {
             />
           </Link>
         ))}
+
+        {/* Add sign out button */}
+        <Button
+          onClick={() => signOut()} // This will trigger the sign-out action
+          className="w-full flex items-center justify-start space-x-2"
+        >
+          <LogOut className="h-6 w-6" />
+          <span>Выйти</span>
+        </Button>
       </nav>
     </aside>
   );
