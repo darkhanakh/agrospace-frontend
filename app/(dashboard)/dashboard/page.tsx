@@ -83,19 +83,6 @@ const DashboardPage = () => {
       "Ближайшие фермы сообщают о повышенной активности вредителей",
       "Ожидается рост цен на кукурузу на местном рынке",
     ]);
-
-    // Получение координат пользователя (пример)
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLatitude(position.coords.latitude);
-          setLongitude(position.coords.longitude);
-        },
-        (error) => {
-          console.error("Не удалось получить геолокацию:", error);
-        }
-      );
-    }
   };
 
   return (
@@ -238,33 +225,7 @@ const DashboardPage = () => {
                 </CardContent>
               </Card>
             </div>
-            {/* Карта поля */}
-            <div className="mt-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Ваше поле на карте</CardTitle>
-                  <CardDescription>Местоположение вашего поля</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-64 w-full rounded-lg overflow-hidden">
-                    <MapContainer
-                      center={[latitude, longitude]}
-                      zoom={13}
-                      scrollWheelZoom={false}
-                      style={{ height: "100%", width: "100%" }}
-                    >
-                      <TileLayer
-                        attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      />
-                      <Marker position={[latitude, longitude]}>
-                        <Popup>Ваше поле находится здесь.</Popup>
-                      </Marker>
-                    </MapContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+
             {/* Последние оповещения и инсайты сообщества */}
             <div className="mt-6 grid gap-6 md:grid-cols-2">
               {/* Последние оповещения */}

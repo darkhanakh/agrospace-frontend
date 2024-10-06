@@ -117,7 +117,7 @@ const FieldAnalyticsPage = () => {
       };
 
       setChartData((prevData) => [...prevData.slice(-6), newEntry]);
-    }, 5000); // Обновление каждые 5 секунд
+    }, 10000); // Обновление каждые 5 секунд
 
     return () => clearInterval(interval);
   }, []);

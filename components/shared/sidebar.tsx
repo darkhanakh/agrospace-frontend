@@ -29,7 +29,6 @@ interface Props {
 
 const routeMapping = [
   { path: "/dashboard", label: "Панель управления", Icon: CircleGauge },
-  { path: "/dashboard/weather-map", label: "Карта погоды", Icon: Cloud },
   { path: "/dashboard/chat", label: "AI-помощник", Icon: MessageSquare },
   { path: "/dashboard/planner", label: "Планировщик", Icon: Calendar },
   {

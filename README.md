@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+AgroSpace Dashboard
 
-## Getting Started
+AgroSpace is a comprehensive web application designed to assist farmers and agricultural professionals in managing their farms more efficiently. Leveraging modern technologies such as Next.js, Supabase, and OpenAI's machine learning models, AgroSpace Dashboard provides real-time analytics, user-friendly chat interactions, and insightful data visualizations to optimize farming operations.
 
-First, run the development server:
+![Project Screenshot](./docs/images/example.png)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Features
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+    AI-Powered Chat: Interact with an intelligent assistant to receive recommendations, answer questions, and analyze uploaded images related to agricultural activities.
+    Image Upload & Analysis: Upload images of crops to get real-time analysis and insights using OpenAI's machine learning models.
+    User Profiles: Manage user information with additional profile fields stored in Supabase.
+    Dashboard Analytics: Monitor key metrics such as soil moisture, temperature, precipitation, and crop health index.
+    Real-Time Alerts & Community Insights: Stay updated with the latest alerts and insights from the farming community.
+    Interactive Map: Visualize the location of your fields on an interactive map powered by Leaflet and OpenStreetMap.
+    History Saving: All chat interactions and user data are securely stored in Supabase, ensuring data persistence and easy access.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Technologies Used
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+    Frontend:
+        Next.js - React framework for server-rendered applications.
+        React - JavaScript library for building user interfaces.
+        TypeScript - Typed superset of JavaScript.
+        Tailwind CSS - Utility-first CSS framework for styling.
+        Recharts - Charting library for data visualization.
+        React Leaflet - Maps integration using Leaflet.
+        Lucide React - Icon library.
+    Backend:
+        Next.js API Routes - Serverless functions for backend logic.
+        Supabase - Backend as a Service (BaaS) for database, authentication, and storage.
+        OpenAI - AI models for natural language processing and image analysis.
+        Formidable - Node.js module for parsing form data, especially file uploads.
