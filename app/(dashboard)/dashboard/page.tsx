@@ -38,6 +38,7 @@ import "leaflet/dist/leaflet.css";
 
 // Исправление для иконок Leaflet
 import L from "leaflet";
+import Link from "next/link";
 
 const DashboardPage = () => {
   const supabase = createClient();
@@ -142,8 +143,10 @@ const DashboardPage = () => {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Профиль</span>
+                  <Link className="flex items-center" href="/dashboard/profile">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Профиль</span>
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                   <Sun className="mr-2 h-4 w-4" />

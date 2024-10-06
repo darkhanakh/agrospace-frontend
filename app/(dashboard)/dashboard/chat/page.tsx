@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useChat, Message } from "ai/react";
+import React, { useEffect, useState, useRef } from "react";
+import { Message } from "ai";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,24 +13,32 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, Bot, User, Stars, Trash2 } from "lucide-react"; // Import Trash2 icon
+import { Send, Bot, User, Stars, Trash2, Camera, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TableRenderer } from "@/components/shared/table-renderer"; // Import Skeleton component
+import { TableRenderer } from "@/components/shared/table-renderer";
+
+interface CustomMessage extends Message {
+  responseMessages?: {
+    role: string;
+    content: { type: string; text: string }[];
+  }[];
+  imageUrl?: string; // Added field for image URL
+}
 
 export default function AIChat() {
-  // State to manage initial messages loaded from local storage
-  const [initialMessages, setInitialMessages] = useState<Message[] | null>(
-    null
-  );
+  const [messages, setMessages] = useState<CustomMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Load messages from local storage when the component mounts
   useEffect(() => {
     const savedMessages = localStorage.getItem("chatMessages");
     if (savedMessages) {
-      setInitialMessages(JSON.parse(savedMessages));
+      setMessages(JSON.parse(savedMessages));
     } else {
-      // If no messages are saved, start with the default assistant message
-      setInitialMessages([
+      setMessages([
         {
           id: "1",
           role: "assistant",
@@ -41,78 +49,89 @@ export default function AIChat() {
     }
   }, []);
 
-  // Initialize useChat with the loaded messages
-  const { messages, input, handleInputChange, handleSubmit, setMessages } =
-    useChat({
-      initialMessages: initialMessages || [],
-    });
-
-  // Save messages to local storage whenever they change
   useEffect(() => {
-    if (initialMessages !== null) {
-      localStorage.setItem("chatMessages", JSON.stringify(messages));
+    localStorage.setItem("chatMessages", JSON.stringify(messages));
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
-  }, [messages, initialMessages]);
+  }, [messages]);
 
-  // Function to clear chat history
-  const clearChatHistory = () => {
-    // Remove messages from local storage
-    localStorage.removeItem("chatMessages");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() && !imageUrl) return;
 
-    // Reset messages to initial state
-    const defaultMessage = {
-      id: "1",
-      role: "assistant",
-      content:
-        "Здравствуйте! Как я могу вам помочь с вашими сельскохозяйственными вопросами сегодня?",
+    const userMessage: CustomMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: input,
+      imageUrl: imageUrl || undefined, // Include imageUrl if present
     };
-    setMessages([defaultMessage]);
-    setInitialMessages([defaultMessage]);
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, userMessage],
+          imageUrl,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to fetch response");
+
+      const data = await response.json();
+      const assistantMessage: CustomMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.text,
+        responseMessages: data.responseMessages,
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error("Error in chat:", error);
+      // Handle error (e.g., show an error message to the user)
+    } finally {
+      setIsLoading(false);
+      setImageUrl(null);
+    }
   };
 
-  // Show a skeleton loading state until messages are loaded
-  if (initialMessages === null) {
-    return (
-      <Card className="w-full h-[90vh] mx-auto flex flex-col">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold flex items-center">
-            Персональный помощник <Stars className="ml-2" />
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex-grow overflow-hidden">
-          <ScrollArea className="h-full pr-4">
-            {/* Skeleton for messages */}
-            {[...Array(3)].map((_, index) => (
-              <div
-                key={index}
-                className="flex items-start space-x-2 mb-4 justify-start"
-              >
-                <Skeleton className="w-10 h-10 rounded-full bg-secondary" />
-                <div className="rounded-lg p-3 max-w-[80%] bg-secondary text-secondary-foreground">
-                  <Skeleton className="h-4 w-full mb-2" />
-                  <Skeleton className="h-4 w-5/6 mb-2" />
-                  <Skeleton className="h-4 w-3/4" />
-                </div>
-              </div>
-            ))}
-          </ScrollArea>
-        </CardContent>
-        <CardFooter>
-          <form className="flex w-full space-x-2">
-            <Input
-              type="text"
-              placeholder="Загрузка..."
-              disabled
-              className="flex-grow"
-            />
-            <Button type="submit" disabled>
-              <Send className="h-4 w-4" />
-            </Button>
-          </form>
-        </CardFooter>
-      </Card>
-    );
-  }
+  const clearChatHistory = () => {
+    localStorage.removeItem("chatMessages");
+    setMessages([
+      {
+        id: "1",
+        role: "assistant",
+        content:
+          "Здравствуйте! Как я могу вам помочь с вашими сельскохозяйственными вопросами сегодня?",
+      },
+    ]);
+    setImageUrl(null);
+  };
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setImageUrl(base64String);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImageUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   return (
     <Card className="w-full h-[90vh] mx-auto flex flex-col">
@@ -125,7 +144,7 @@ export default function AIChat() {
           Очистить историю
         </Button>
       </CardHeader>
-      <CardContent className="flex-grow overflow-hidden">
+      <CardContent className="flex-grow overflow-hidden" ref={scrollAreaRef}>
         <ScrollArea className="h-full pr-4">
           {messages.map((message) => (
             <div
@@ -151,21 +170,64 @@ export default function AIChat() {
                 }`}
               >
                 <TableRenderer content={message.content} />
+                {message.imageUrl && (
+                  <img
+                    src={message.imageUrl}
+                    alt="User uploaded"
+                    className="mt-2 max-w-full h-auto rounded-lg"
+                  />
+                )}
               </div>
             </div>
           ))}
+          {isLoading && (
+            <div className="flex items-center space-x-2">
+              <Skeleton className="w-10 h-10 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-[250px]" />
+                <Skeleton className="h-4 w-[200px]" />
+              </div>
+            </div>
+          )}
         </ScrollArea>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="flex flex-col space-y-4">
+        {imageUrl && (
+          <div className="relative w-full">
+            <img
+              src={imageUrl}
+              alt="Preview"
+              className="max-w-full h-auto max-h-64 rounded-lg"
+            />
+            <Button
+              variant="destructive"
+              size="icon"
+              className="absolute top-2 right-2"
+              onClick={removeImage}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="flex w-full space-x-2">
           <Input
             type="text"
             placeholder="Задайте любой вопрос о сельском хозяйстве..."
             value={input}
-            onChange={handleInputChange}
+            onChange={(e) => setInput(e.target.value)}
             className="flex-grow"
           />
-          <Button type="submit">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            ref={fileInputRef}
+            className="hidden"
+          />
+          <Button type="button" onClick={() => fileInputRef.current?.click()}>
+            <Camera className="h-4 w-4" />
+          </Button>
+          <Button type="submit" disabled={isLoading}>
             <Send className="h-4 w-4" />
           </Button>
         </form>
