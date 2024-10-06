@@ -1,0 +1,1 @@
+{"baseURL": "https://worldview.earthdata.nasa.gov/", "viewParameters": "v=37.6075,55.7458,37.6275,55.7658", "layers": ["Reference_Labels_15m(hidden)", "Reference_Features_15m(hidden)", "Coastlines_15m(hidden)", "MODIS_Terra_EVI_8Day(palette=gray_2)"], "lg": "true", "time": "2024-10-03-T04:51:31Z"}
