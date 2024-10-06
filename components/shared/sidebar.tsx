@@ -10,7 +10,11 @@ import {
   MessageSquare,
   Calendar,
   Menu,
-  LogOut, // Importing the logout icon
+  LogOut,
+  BinocularsIcon,
+  LineChartIcon,
+  CircleGaugeIcon,
+  CircleGauge, // Importing the logout icon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SidebarButton } from "@/components/shared/sidebar-button";
@@ -24,15 +28,15 @@ interface Props {
 }
 
 const routeMapping = [
-  { path: "/dashboard", label: "Панель управления", Icon: LineChart },
+  { path: "/dashboard", label: "Панель управления", Icon: CircleGauge },
   { path: "/dashboard/weather-map", label: "Карта погоды", Icon: Cloud },
-  {
-    path: "/dashboard/water-resources",
-    label: "Водные ресурсы",
-    Icon: Droplet,
-  },
   { path: "/dashboard/chat", label: "AI-помощник", Icon: MessageSquare },
   { path: "/dashboard/planner", label: "Планировщик", Icon: Calendar },
+  {
+    path: "/dashboard/field",
+    label: "Ваши поля",
+    Icon: BinocularsIcon,
+  },
 ];
 
 const Sidebar: React.FC<Props> = memo(({ isSidebarOpen, setIsSidebarOpen }) => {
